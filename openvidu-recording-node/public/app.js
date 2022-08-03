@@ -13,7 +13,9 @@ function joinSession() {
 	// --- 0) Change the button ---
 		
 	document.getElementById("join-btn").disabled = true;
-	document.getElementById("join-btn").innerHTML = "Joining...";
+	document.getElementById("join-btn").innerHTML = "Cargando...";
+
+    fetchAll();
 
 	getToken(function () {
 
@@ -115,7 +117,13 @@ function joinSession() {
 					resolution: '640x480', // The resolution of your video
 					frameRate: 30, // The frame rate of your video
 					insertMode: 'APPEND', // How the video is inserted in the target element 'video-container'
-					mirror: false // Whether to mirror your local video or not
+					mirror: false, // Whether to mirror your local video or not
+					filter: {
+                        type: "GStreamerFilter",
+                        options: {
+                            command: 'clockoverlay valignment=bottom halignment=right shaded-background=true font-desc="Sans, 16" time-format="%d/%m/%Y %H:%M:%S"'
+                        }
+                    }
 				});
 
 				// --- 7) Specify the actions when events take place in our publisher ---
@@ -168,7 +176,7 @@ function joinSession() {
 				});
 
 				// --- 8) Publish your stream ---
-
+                publisher.subscribeToRemote();
 				session.publish(publisher);
 
 			})
@@ -193,7 +201,7 @@ function leaveSession() {
 
 function enableBtn (){
 	document.getElementById("join-btn").disabled = false;
-	document.getElementById("join-btn").innerHTML = "Join!";
+	document.getElementById("join-btn").innerHTML = "Entrar";
 }
 
 /* APPLICATION REST METHODS */
@@ -232,9 +240,8 @@ function removeUser() {
 function closeSession() {
 	httpRequest(
 		'DELETE',
-		'api/close-session', {
-			sessionName: sessionName
-		},
+		'api/close-session/'+sessionName,
+		 {},
 		'Session couldn\'t be closed',
 		res => {
 			console.warn("Session " + sessionName + " has been closed");

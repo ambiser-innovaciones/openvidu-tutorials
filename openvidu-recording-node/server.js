@@ -43,10 +43,20 @@ var OPENVIDU_SECRET = process.argv[3];
 // Entrypoint to OpenVidu Node Client SDK
 var OV = new OpenVidu(OPENVIDU_URL, OPENVIDU_SECRET);
 
+/*
+OV.fetch().then(function() {
+  console.log(OV.activeSessions);
+}).catch(function(err) {
+  console.log(err);
+});
+*/
+
 // Collection to pair session names with OpenVidu Session objects
 var mapSessions = {};
 // Collection to pair session names with tokens
 var mapSessionNamesTokens = {};
+
+var activeSessions = {};
 
 console.log("App listening on port 5000");
 
@@ -67,15 +77,18 @@ app.post('/api/get-token', function (req, res) {
 
     // Build connectionProperties object with PUBLISHER role
     var connectionProperties = {
-        role: role
+        role: role,
+        kurentoOptions: {
+            allowedFilters: ["GStreamerFilter", "FaceOverlayFilter"]
+        }
     }
 
-    if (mapSessions[sessionName]) {
+    if (mapSessions[sessionName] || activeSessions[sessionName]) {
         // Session already exists
         console.log('Existing session ' + sessionName);
 
         // Get the existing Session from the collection
-        var mySession = mapSessions[sessionName];
+        var mySession = (mapSessions[sessionName]?mapSessions[sessionName]:activeSessions[sessionName]);
 
         // Generate a new Connection asynchronously with the recently created connectionProperties
         mySession.createConnection(connectionProperties)
@@ -107,7 +120,7 @@ function newSession(sessionName, connectionProperties, res) {
     console.log('New session ' + sessionName);
 
     // Create a new OpenVidu Session asynchronously
-    OV.createSession()
+    OV.createSession({customSessionId: sessionName})
         .then(session => {
             // Store the new Session in the collection of Sessions
             mapSessions[sessionName] = session;
@@ -171,17 +184,18 @@ app.post('/api/remove-user', function (req, res) {
 });
 
 // Close session
-app.delete('/api/close-session', function (req, res) {
+app.delete('/api/close-session/:sessionName', function (req, res) {
     // Retrieve params from POST body
-    var sessionName = req.body.sessionName;
+    //var sessionName = req.body.sessionName;
+    var sessionName = req.params.sessionName;
     console.log("Closing session | {sessionName}=" + sessionName);
 
     // If the session exists
     if (mapSessions[sessionName]) {
         var session = mapSessions[sessionName];
+        //delete mapSessions[sessionName];
+        //delete mapSessionNamesTokens[sessionName];
         session.close();
-        delete mapSessions[sessionName];
-        delete mapSessionNamesTokens[sessionName];
         res.status(200).send();
     } else {
         var msg = 'Problems in the app server: the SESSION does not exist';
@@ -219,6 +233,8 @@ app.get('/api/fetch-all', function (req, res) {
             var sessions = [];
             OV.activeSessions.forEach(s => {
                 sessions.push(sessionToJson(s));
+                //activeSessions[s.sessionId]=sessionToJson(s);
+                activeSessions[s.sessionId]=s;
             });
             console.log("Any change: " + changed);
             res.status(200).send(sessions);
